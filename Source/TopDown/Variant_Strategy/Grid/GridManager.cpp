@@ -16,7 +16,34 @@ AGridManager::AGridManager()
 void AGridManager::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("BeginPlay called!"));
+	}
+
+	InitializeGrid();
+
+	// Test: verify some cells exist
+	FCellData *Cell000 = GetCellData(FGridCoordinate(0, 0, 0));
+	FCellData *Cell555 = GetCellData(FGridCoordinate(5, 5, 1));
+
+	if (GEngine)
+	{
+		if (Cell000)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan,
+											 FString::Printf(TEXT("Cell (0,0,0): walkable=%d occupied=%d"),
+															 Cell000->bWalkable, Cell000->bOccupied));
+		}
+
+		if (Cell555)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan,
+											 FString::Printf(TEXT("Cell (5,5,1): walkable=%d occupied=%d"),
+															 Cell555->bWalkable, Cell555->bOccupied));
+		}
+	}
 }
 
 // Called every frame
@@ -118,3 +145,65 @@ void AGridManager::PostEditChangeProperty(FPropertyChangedEvent &PropertyChanged
 	}
 }
 #endif
+
+// Cell data access functions
+FCellData *AGridManager::GetCellData(const FGridCoordinate &Coord)
+{
+	return CellDataMap.Find(Coord);
+}
+
+const FCellData *AGridManager::GetCellData(const FGridCoordinate &Coord) const
+{
+	return CellDataMap.Find(Coord);
+}
+
+void AGridManager::SetCellData(const FGridCoordinate &Coord, const FCellData &Data)
+{
+	CellDataMap.Add(Coord, Data);
+}
+
+bool AGridManager::IsCellWalkable(const FGridCoordinate &Coord) const
+{
+	const FCellData *Data = CellDataMap.Find(Coord);
+	return Data != nullptr ? Data->bWalkable : false;
+}
+
+bool AGridManager::IsCellOccupied(const FGridCoordinate &Coord) const
+{
+	const FCellData *Data = CellDataMap.Find(Coord);
+	return Data != nullptr ? Data->bOccupied : false;
+}
+
+void AGridManager::InitializeGrid()
+{
+	ClearGrid();
+
+	// Create all cells in the debug grid bounds
+	for (int32 Floor = 0; Floor < DebugFloorCount; ++Floor)
+	{
+		for (int32 Y = 0; Y < DebugGridSizeY; ++Y)
+		{
+			for (int32 X = 0; X < DebugGridSizeX; ++X)
+			{
+				FGridCoordinate Coord(X, Y, Floor);
+				FCellData DefaultData;
+				// DefaultData.bWalkable = true (struct default)
+				// DefaultData.bOccupied = false (struct default)
+
+				CellDataMap.Add(Coord, DefaultData);
+			}
+		}
+	}
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green,
+										 FString::Printf(TEXT("Grid initialized: %dx%dx%d = %d cells"),
+														 DebugGridSizeX, DebugGridSizeY, DebugFloorCount, CellDataMap.Num()));
+	}
+}
+
+void AGridManager::ClearGrid()
+{
+	CellDataMap.Empty();
+}

@@ -4,6 +4,7 @@
 
 #include "GridTypes.h"
 #include "CoreMinimal.h"
+#include "Grid/CellData.h"
 #include "GameFramework/Actor.h"
 #include "GridManager.generated.h"
 
@@ -37,6 +38,40 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Grid")
 	bool IsValidGridPosition(const FGridCoordinate &GridCoord) const;
 
+
+	// Cell Data Management
+	/** 
+	* Get cell data at coordinate. Returns nullptr if cell doesn't exist.
+	* Returned pointer is valid until CellDataMap is modified.
+	*/
+	FCellData *GetCellData(const FGridCoordinate &Coord);
+
+	/** Get cell data (const version). Returns nullptr if cell doesn't exist. */
+	const FCellData *GetCellData(const FGridCoordinate &Coord) const;
+
+	/** Set cell data at coordinate. Creates cell if it doesn't exist. */
+	UFUNCTION(BlueprintCallable, Category = "Grid")
+	void SetCellData(const FGridCoordinate &Coord, const FCellData &Data);
+
+	/** Check if cell is walkable. Returns false if cell doesn't exist. */
+	UFUNCTION(BlueprintCallable, Category = "Grid")
+	bool IsCellWalkable(const FGridCoordinate &Coord) const;
+
+	/** Check if cell is occupied. Returns false if cell doesn't exist. */
+	UFUNCTION(BlueprintCallable, Category = "Grid")
+	bool IsCellOccupied(const FGridCoordinate &Coord) const;
+
+	
+	// Grid initialization
+	/** Initialize grid with default walkable cells */
+	UFUNCTION(BlueprintCallable, Category = "Grid")
+	void InitializeGrid();
+
+	/** Clear all cell data */
+	UFUNCTION(BlueprintCallable, Category = "Grid")
+	void ClearGrid();
+
+
 	// Debugging
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Debug")
 	bool bShowDebugGrid = true;
@@ -64,4 +99,8 @@ public:
 
 private:
 	void DrawDebugGrid() const;
+
+	/** Storage for all cell data in the grid */
+	UPROPERTY()
+	TMap<FGridCoordinate, FCellData> CellDataMap;
 };
