@@ -109,3 +109,4 @@ $RECYCLE.BIN/
 # User-specific files
 *.userprefs
 *.user
+compile_commands.json

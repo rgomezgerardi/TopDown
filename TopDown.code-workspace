@@ -19,7 +19,7 @@
 			"DOTNET_MULTILEVEL_LOOKUP": "0",
 			"DOTNET_ROLL_FORWARD": "LatestMajor"
 		},
-		"dotnet.defaultSolution": "TopDown/TopDown.sln"
+		"clangd.path": "C:\\\\Program Files\\\\LLVM\\\\bin\\\\clangd.exe"
 	},
 	"extensions": {
 		"recommendations": [
