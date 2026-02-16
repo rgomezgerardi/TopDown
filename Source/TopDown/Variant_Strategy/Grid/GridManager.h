@@ -71,9 +71,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Grid")
 	void ClearGrid();
 
+	
+	// Pathfinding test
+	/** Find and visualize path between two coordinates (debug) */
+	UFUNCTION(BlueprintCallable, Category = "Grid|Debug")
+	void DebugDrawPath(FGridCoordinate Start, FGridCoordinate Goal);
 
-	// Debugging
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Debug")
+	
+	// Debugging UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Debug")
 	bool bShowDebugGrid = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Debug")
@@ -83,8 +88,8 @@ public:
 	int32 DebugGridSizeY = 10;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Debug")
-	int32 DebugFloorCount = 3;
-
+	int32 DebugFloorCount = 1;
+	
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

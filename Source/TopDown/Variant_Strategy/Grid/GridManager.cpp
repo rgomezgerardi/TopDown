@@ -2,6 +2,7 @@
 
 
 #include "Grid/GridManager.h"
+#include "Grid/Pathfinder.h"
 #include "DrawDebugHelpers.h"
 
 // Sets default values
@@ -17,13 +18,13 @@ void AGridManager::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("BeginPlay called!"));
-	}
-
 	InitializeGrid();
 
+	// Test pathfinding
+    FGridCoordinate Start(1, 1, 0);
+    FGridCoordinate Goal(8, 8, 0);
+    DebugDrawPath(Start, Goal);
+	
 	// Test: verify some cells exist
 	FCellData *Cell000 = GetCellData(FGridCoordinate(0, 0, 0));
 	FCellData *Cell555 = GetCellData(FGridCoordinate(5, 5, 1));
@@ -89,38 +90,61 @@ bool AGridManager::IsValidGridPosition(const FGridCoordinate &GridCoord) const
 
 void AGridManager::DrawDebugGrid() const
 {
-	if (!GetWorld()) //Prevets crash when world is null
-		return;
-
-	const float LineThickness = 2.0f;
-	const FColor FloorColors[] = {
-		FColor::Green,
-		FColor::Blue,
-		FColor::Yellow,
-		FColor::Cyan,
-		FColor::Magenta};
-
-	for (int32 Floor = 0; Floor < DebugFloorCount; ++Floor)
-	{
-		float Z = GridOrigin.Z + (Floor * FloorHeight); // Calculate world height for this floor
-		FColor Color = FloorColors[Floor % 5]; // Cycle through colors
-
-		// Horizontal Lines (Y)
-		for (int32 X = 0; X <= DebugGridSizeX; ++X)
-		{
-			FVector Start = GridOrigin + FVector(X * CellSize, 0, Floor * FloorHeight);
-			FVector End = GridOrigin + FVector(X * CellSize, DebugGridSizeY * CellSize, Floor * FloorHeight);
-			DrawDebugLine(GetWorld(), Start, End, Color, false, -1.0f, 0, LineThickness);
-		}
-
-		// Vertical Lines (X)
-		for (int32 Y = 0; Y <= DebugGridSizeY; ++Y)
-		{
-			FVector Start = GridOrigin + FVector(0, Y * CellSize, Floor * FloorHeight);
-			FVector End = GridOrigin + FVector(DebugGridSizeX * CellSize, Y * CellSize, Floor * FloorHeight);
-			DrawDebugLine(GetWorld(), Start, End, Color, false, -1.0f, 0, LineThickness);
-		}
-	}
+    if (!GetWorld()) return;
+    
+    const float HalfCellSize = CellSize * 0.5f;
+    const float BoxHeight = 5.0f;  // Thin box height
+    
+    for (int32 Floor = 0; Floor < DebugFloorCount; ++Floor)
+    {
+        for (int32 Y = 0; Y < DebugGridSizeY; ++Y)
+        {
+            for (int32 X = 0; X < DebugGridSizeX; ++X)
+            {
+                FGridCoordinate Coord(X, Y, Floor);
+                const FCellData* Data = CellDataMap.Find(Coord);
+                
+                // Determine color based on cell state
+                FColor CellColor;
+                if (!Data)
+                {
+                    CellColor = FColor(128, 128, 128, 50);  // Gray - no data
+                }
+                else if (!Data->bWalkable)
+                {
+                    CellColor = FColor(255, 0, 0, 100);     // Red - blocked
+                }
+                else if (Data->bOccupied)
+                {
+                    CellColor = FColor(255, 255, 0, 100);   // Yellow - occupied
+                }
+                else
+                {
+                    CellColor = FColor(0, 255, 0, 50);      // Green - walkable
+                }
+                
+                // Calculate box position (at floor level, not centered vertically)
+                FVector CellWorldPos = GridOrigin + FVector(
+                    (X + 0.5f) * CellSize,
+                    (Y + 0.5f) * CellSize,
+                    Floor * FloorHeight + BoxHeight  // Just above floor
+                );
+                
+                FVector BoxExtent(HalfCellSize - 2.0f, HalfCellSize - 2.0f, BoxHeight);
+                
+                DrawDebugBox(
+                    GetWorld(),
+                    CellWorldPos,
+                    BoxExtent,
+                    CellColor,
+                    false,
+                    -1.0f,
+                    0,
+                    2.0f
+                );
+            }
+        }
+    }
 }
 
 #if WITH_EDITOR
@@ -176,34 +200,109 @@ bool AGridManager::IsCellOccupied(const FGridCoordinate &Coord) const
 
 void AGridManager::InitializeGrid()
 {
-	ClearGrid();
-
-	// Create all cells in the debug grid bounds
-	for (int32 Floor = 0; Floor < DebugFloorCount; ++Floor)
-	{
-		for (int32 Y = 0; Y < DebugGridSizeY; ++Y)
-		{
-			for (int32 X = 0; X < DebugGridSizeX; ++X)
-			{
-				FGridCoordinate Coord(X, Y, Floor);
-				FCellData DefaultData;
-				// DefaultData.bWalkable = true (struct default)
-				// DefaultData.bOccupied = false (struct default)
-
-				CellDataMap.Add(Coord, DefaultData);
-			}
-		}
-	}
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green,
-										 FString::Printf(TEXT("Grid initialized: %dx%dx%d = %d cells"),
-														 DebugGridSizeX, DebugGridSizeY, DebugFloorCount, CellDataMap.Num()));
-	}
+    ClearGrid();
+    
+    // Create all cells in the debug grid bounds
+    for (int32 Floor = 0; Floor < DebugFloorCount; ++Floor)
+    {
+        for (int32 Y = 0; Y < DebugGridSizeY; ++Y)
+        {
+            for (int32 X = 0; X < DebugGridSizeX; ++X)
+            {
+                FGridCoordinate Coord(X, Y, Floor);
+                FCellData DefaultData;
+                
+                CellDataMap.Add(Coord, DefaultData);
+            }
+        }
+    }
+    
+    // Mark some cells as blocked for testing
+    FCellData BlockedCell;
+    BlockedCell.bWalkable = false;
+    BlockedCell.bOccupied = false;
+    
+    SetCellData(FGridCoordinate(3, 3, 0), BlockedCell);
+    SetCellData(FGridCoordinate(4, 3, 0), BlockedCell);
+    SetCellData(FGridCoordinate(5, 3, 0), BlockedCell);
+    SetCellData(FGridCoordinate(3, 4, 0), BlockedCell);
+    SetCellData(FGridCoordinate(5, 4, 0), BlockedCell);
+    
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, 
+            FString::Printf(TEXT("Grid initialized: %dx%dx%d = %d cells"), 
+            DebugGridSizeX, DebugGridSizeY, DebugFloorCount, CellDataMap.Num()));
+    }
 }
+
 
 void AGridManager::ClearGrid()
 {
 	CellDataMap.Empty();
+}
+
+
+void AGridManager::DebugDrawPath(FGridCoordinate Start, FGridCoordinate Goal)
+{
+    if (!GetWorld()) return;
+    
+    // Find path
+    TArray<FGridCoordinate> Path = FPathfinder::FindPath(Start, Goal, this);
+    
+    if (Path.Num() == 0)
+    {
+        // No path found
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, 
+                TEXT("No path found!"));
+        }
+        return;
+    }
+    
+    // Debug message
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, 
+            FString::Printf(TEXT("Path found: %d steps"), Path.Num()));
+    }
+    
+    // Draw lines connecting path cells
+    for (int32 i = 0; i < Path.Num() - 1; ++i)
+    {
+        FVector Start3D = GridToWorld(Path[i]) + FVector(0, 0, 10);
+        FVector End3D = GridToWorld(Path[i + 1]) + FVector(0, 0, 10);
+        
+        DrawDebugLine(
+            GetWorld(),
+            Start3D,
+            End3D,
+            FColor::Cyan,
+            true,
+            -1.0f,
+            0,
+            5.0f
+        );
+    }
+    
+    // Draw spheres at ALL waypoints
+    for (int32 i = 0; i < Path.Num(); ++i)
+    {
+        FVector WaypointPos = GridToWorld(Path[i]) + FVector(0, 0, 10);
+        
+        // Last waypoint (goal) is green and bigger
+        FColor SphereColor = (i == Path.Num() - 1) ? FColor::Green : FColor::Yellow;
+        float SphereSize = (i == Path.Num() - 1) ? 30.0f : 20.0f;
+        
+        DrawDebugSphere(
+            GetWorld(),
+            WaypointPos,
+            SphereSize,
+            8,
+            SphereColor,
+            true,
+            -1.0f
+        );
+    }
 }

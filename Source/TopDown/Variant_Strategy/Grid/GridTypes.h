@@ -44,6 +44,12 @@ struct FGridCoordinate
         return !(*this == Other);
     }
 
+    // Addition operator for coordinate offsets
+    friend FGridCoordinate operator+(const FGridCoordinate& A, const FGridCoordinate& B)
+    {
+        return FGridCoordinate(A.X + B.X, A.Y + B.Y, A.Floor + B.Floor);
+    }
+    
     // Hash function (for TMap or TSet)
     friend uint32 GetTypeHash(const FGridCoordinate &Coord)
     {
