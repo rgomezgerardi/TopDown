@@ -1,9 +1,9 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
 #include "StrategyHUD.h"
 #include "StrategyUnit.h"
 #include "StrategyPlayerController.h"
+#include "SelectionComponent.h"
 #include "StrategyUI.h"
 
 void AStrategyHUD::BeginPlay()
@@ -25,7 +25,6 @@ void AStrategyHUD::DragSelectUpdate(FVector2D Start, FVector2D WidthAndHeight, F
 	BoxStart = Start;
 	BoxSize = WidthAndHeight;
 	BoxCurrentPosition = CurrentPosition;
-
 }
 
 void AStrategyHUD::DrawHUD()
@@ -45,12 +44,12 @@ void AStrategyHUD::DrawHUD()
 			TArray<AStrategyUnit*> BoxedUnits;
 			GetActorsInSelectionRectangle(BoxStart, BoxCurrentPosition, BoxedUnits, true);
 
-			// update the unit selection on the player controller
-			PC->DragSelectUnits(BoxedUnits);
+			// update the unit selection on the selection component
+			PC->GetSelectionComponent()->DragSelectUnits(BoxedUnits);
 		}
 
 		// get the currently selected units
-		TArray<AStrategyUnit*> SelectedUnits = PC->GetSelectedUnits();
+		const TArray<AStrategyUnit*>& SelectedUnits = PC->GetSelectedUnits();
 
 		// update the selection count on the UI widget
 		UIWidget->SetSelectedUnitsCount(SelectedUnits.Num());
@@ -70,8 +69,6 @@ void AStrategyHUD::DrawHUD()
 					DrawText(SelectionString, FColor::White, ScreenCoords.X - 25.0f, ScreenCoords.Y + 25.0f, nullptr, 1.5f);
 				}
 			}
-			
 		}
 	}
-
 }
