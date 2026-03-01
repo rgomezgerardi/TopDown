@@ -17,6 +17,7 @@ class AStrategyUnit;
 class UCameraControlComponent;
 class USelectionComponent;
 class UUnitCommandComponent;
+class AGridManager;
 
 /** Enum to determine the last used input type */
 UENUM(BlueprintType)
@@ -47,6 +48,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
 	TObjectPtr<UUnitCommandComponent> UnitCommandComponent;
 
+	/** Reference to the level's GridManager, cached from GameMode on possess */
+	UPROPERTY()
+	TObjectPtr<AGridManager> GridManager;
+
 	/** Strategy Pawn associated with this controller */
 	TObjectPtr<AStrategyPawn> ControlledPawn;
 
@@ -68,6 +73,10 @@ protected:
 	/** Input Action for select and click */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* SelectClickAction;
+
+	/** Input Action for deselecting all units */
+	UPROPERTY(EditAnywhere, Category="Input")
+	UInputAction* DeselectClickAction;
 
 	/** Input Action for select press and hold */
 	UPROPERTY(EditAnywhere, Category="Input")
@@ -182,6 +191,9 @@ protected:
 
 	/** Select click action */
 	void SelectClick(const FInputActionValue& Value);
+
+	/** Deselect all units */
+	void DeselectClick(const FInputActionValue& Value);
 
 	/** Presses or releases the selection modifier key */
 	void SelectionModifier(const FInputActionValue& Value);

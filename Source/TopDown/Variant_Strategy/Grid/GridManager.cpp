@@ -66,7 +66,7 @@ FGridCoordinate AGridManager::WorldToGrid(const FVector &WorldLocation) const
 	// Conversión a coordenadas discretas
 	int32 X = FMath::FloorToInt(LocalPosition.X / CellSize);
 	int32 Y = FMath::FloorToInt(LocalPosition.Y / CellSize);
-	int32 Floor = FMath::FloorToInt(LocalPosition.Z / FloorHeight);
+	int32 Floor = FMath::Max(0, FMath::FloorToInt(LocalPosition.Z / FloorHeight));
 
 	return FGridCoordinate(X, Y, Floor);
 }

@@ -9,51 +9,42 @@
 class AStrategyUnit;
 
 /**
- * Handles unit movement commands and interaction resolution.
+ * Handles unit movement commands along a sequence of world positions.
+ * Receives a pre-calculated path from the Controller and moves a single unit step by step.
  * Lives on AStrategyPlayerController.
- * The Controller owns all input bindings and passes selected units and goals as parameters.
+ * Has no knowledge of the grid system.
  */
 UCLASS(ClassGroup="Strategy", meta=(BlueprintSpawnableComponent))
 class UUnitCommandComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-	/** The world location of the last issued move command.
-	 *  Cached here because OnMoveCompleted fires after the cursor has moved. */
-	FVector CachedGoal = FVector::ZeroVector;
+	/** The unit currently being moved */
+	AStrategyUnit* ActiveUnit = nullptr;
 
-	/** Cached list of units from the last move command.
-	 *  Used in OnMoveCompleted to exclude selected units from the interaction overlap test. */
-	TArray<AStrategyUnit*> CachedUnits;
+	/** The full path of world positions to follow */
+	TArray<FVector> CachedPath;
 
-	/** Copy of the interaction radius from the Controller */
-	float InteractionRadius = 0.0f;
-
-	/** If true, allow units to trigger interactions on arrival.
-	 *  Set to false after the first unit arrives to prevent interaction chains. */
-	bool bAllowInteraction = true;
+	/** Index of the next position to move toward in CachedPath */
+	int32 CurrentPathIndex = 0;
 
 public:
 
 	UUnitCommandComponent();
 
-	/** Stores the interaction radius from the Controller for use in move and overlap calculations */
-	void Initialize(float InInteractionRadius);
+	/** Moves a single unit along the given world-space path.
+	 *  Returns false if the path is empty or the unit is invalid. */
+	bool MoveUnit(AStrategyUnit* Unit, const TArray<FVector>& Path);
 
-	/** Orders all units in the list to move toward Goal.
-	 *  The closest unit moves to Goal directly; others move to random navigable points around it.
-	 *  Returns false if any move request failed. */
-	bool MoveUnits(const TArray<AStrategyUnit*>& Units, FVector Goal);
-
-	/** Resets the interaction flag, allowing the next move command to trigger interactions */
-	void ResetInteraction();
+	/** Returns the final destination of the last move command */
+	FVector GetDestination() const;
 
 private:
 
-	/** Called when a unit finishes moving. Checks for nearby interactable objects at CachedGoal. */
+	/** Moves the active unit to the next position in CachedPath */
+	void MoveToNextPosition();
+
+	/** Called when the active unit finishes moving to a position */
 	UFUNCTION()
 	void OnMoveCompleted(AStrategyUnit* MovedUnit);
-
-	/** Returns the unit in Units closest to Location */
-	AStrategyUnit* GetClosestUnitToLocation(const TArray<AStrategyUnit*>& Units, FVector Location);
 };

@@ -4,6 +4,11 @@
 #include "CameraControlComponent.h"
 #include "SelectionComponent.h"
 #include "UnitCommandComponent.h"
+#include "StrategyGameMode.h"
+#include "Grid/GridManager.h"
+#include "Grid/Pathfinder.h"
+#include "Grid/GridTypes.h"
+#include "Kismet/GameplayStatics.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputComponent.h"
@@ -64,6 +69,7 @@ void AStrategyPlayerController::SetupInputComponent()
 			EnhancedInputComponent->BindAction(SelectHoldAction, ETriggerEvent::Canceled, this, &AStrategyPlayerController::SelectHoldCompleted);
 
 			EnhancedInputComponent->BindAction(SelectClickAction, ETriggerEvent::Completed, this, &AStrategyPlayerController::SelectClick);
+			EnhancedInputComponent->BindAction(DeselectClickAction, ETriggerEvent::Completed, this, &AStrategyPlayerController::DeselectClick);
 
 			EnhancedInputComponent->BindAction(SelectionModifierAction, ETriggerEvent::Triggered, this, &AStrategyPlayerController::SelectionModifier);
 			EnhancedInputComponent->BindAction(SelectionModifierAction, ETriggerEvent::Completed, this, &AStrategyPlayerController::SelectionModifier);
@@ -71,9 +77,6 @@ void AStrategyPlayerController::SetupInputComponent()
 
 			EnhancedInputComponent->BindAction(InteractHoldAction, ETriggerEvent::Started, this, &AStrategyPlayerController::InteractHoldStarted);
 			EnhancedInputComponent->BindAction(InteractHoldAction, ETriggerEvent::Triggered, this, &AStrategyPlayerController::InteractHoldTriggered);
-
-			EnhancedInputComponent->BindAction(InteractClickAction, ETriggerEvent::Started, this, &AStrategyPlayerController::InteractClickStarted);
-			EnhancedInputComponent->BindAction(InteractClickAction, ETriggerEvent::Completed, this, &AStrategyPlayerController::InteractClickCompleted);
 
 			// Touch Interaction
 			EnhancedInputComponent->BindAction(TouchPrimaryHoldAction, ETriggerEvent::Started, this, &AStrategyPlayerController::TouchPrimaryHoldStarted);
@@ -97,7 +100,6 @@ void AStrategyPlayerController::OnPossess(APawn* InPawn)
 	check(ControlledPawn);
 
 	CameraComponent->Initialize(ControlledPawn);
-	UnitCommandComponent->Initialize(InteractionRadius);
 
 	// cast the HUD pointer
 	StrategyHUD = Cast<AStrategyHUD>(GetHUD());
@@ -143,8 +145,14 @@ void AStrategyPlayerController::SelectClick(const FInputActionValue& Value)
 {
 	if (GetLocationUnderCursor(CachedSelection))
 	{
+		CachedInteraction = CachedSelection;
 		DoSelectionCommand();
 	}
+}
+
+void AStrategyPlayerController::DeselectClick(const FInputActionValue& Value)
+{
+	SelectionComponent->DeselectAll();
 }
 
 void AStrategyPlayerController::SelectionModifier(const FInputActionValue& Value)
@@ -179,24 +187,23 @@ void AStrategyPlayerController::InteractHoldTriggered(const FInputActionValue& V
 
 void AStrategyPlayerController::InteractClickStarted(const FInputActionValue& Value)
 {
-	// reset the interaction flag
-	UnitCommandComponent->ResetInteraction();
 }
 
 void AStrategyPlayerController::InteractClickCompleted(const FInputActionValue& Value)
 {
-	// do we have any units selected and a valid interaction location under the cursor?
-	if (SelectionComponent->GetSelectedUnitCount() > 0 && GetLocationUnderCursor(CachedInteraction))
+	UE_LOG(LogTemp, Warning, TEXT("InteractClickCompleted: UnitCount=%d"), SelectionComponent->GetSelectedUnitCount());
+
+	bool bGotLocation = GetLocationUnderCursor(CachedInteraction);
+	UE_LOG(LogTemp, Warning, TEXT("GetLocationUnderCursor: %s, Location=%s"), bGotLocation ? TEXT("true") : TEXT("false"), *CachedInteraction.ToString());
+
+	if (SelectionComponent->GetSelectedUnitCount() > 0 && bGotLocation)
 	{
-		// is double tap select all active?
 		if (SelectionComponent->GetDoubleTapActive())
 		{
-			// release double tap select all
 			SelectionComponent->SetDoubleTapActive(false);
 		}
 		else
 		{
-			// move the selected units to the target location
 			DoMoveUnitsCommand();
 		}
 	}
@@ -339,12 +346,6 @@ void AStrategyPlayerController::DoSelectionCommand()
 
 	GetWorld()->SweepSingleByObjectType(OutHit, Start, End, FQuat::Identity, ObjectParams, InteractionSphere, QueryParams);
 
-	// if we're using the mouse and are not holding the selection modifier key, deselect any units first
-	if (InputMode == SIM_Mouse && !SelectionComponent->GetSelectionModifier())
-	{
-		SelectionComponent->DeselectAll();
-	}
-
 	// did we hit a unit?
 	if (OutHit.bBlockingHit)
 	{
@@ -358,10 +359,8 @@ void AStrategyPlayerController::DoSelectionCommand()
 	}
 	else
 	{
-		// are we using touch input?
-		if (InputMode == SIM_Touch)
+		if (InputMode == SIM_Touch || (InputMode == SIM_Mouse && SelectionComponent->GetSelectedUnitCount() > 0))
 		{
-			// move all selected units to the target location
 			DoMoveUnitsCommand();
 		}
 	}
@@ -369,13 +368,66 @@ void AStrategyPlayerController::DoSelectionCommand()
 
 void AStrategyPlayerController::DoMoveUnitsCommand()
 {
+	// get GridManager from GameMode on demand — guaranteed available after OnActorsInitialized
+	if (!GridManager)
+	{
+		if (AStrategyGameMode* GM = Cast<AStrategyGameMode>(GetWorld()->GetAuthGameMode()))
+		{
+			GridManager = GM->GetGridManager();
+			UE_LOG(LogTemp, Warning, TEXT("GameMode found: %s, GridManager: %s"), *GM->GetName(), GridManager ? TEXT("valid") : TEXT("null"));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("GameMode cast failed"));
+		}
+	}
+
+	if (!GridManager)
+	{
+		return;
+	}
+
+	// get the first selected unit
+	const TArray<AStrategyUnit*>& Units = SelectionComponent->GetSelectedUnits();
+	if (Units.Num() == 0)
+	{
+		return;
+	}
+	AStrategyUnit* Unit = Units[0];
+
 	// set the movement goal based on input mode
 	FVector CurrentMoveGoal = (InputMode == EStrategyInputMode::SIM_Mouse) ? CachedInteraction : CachedSelection;
 
-	// delegate movement and interaction to the component
-	const bool bSuccess = UnitCommandComponent->MoveUnits(SelectionComponent->GetSelectedUnits(), CurrentMoveGoal);
+	// convert world positions to grid coordinates
+	FGridCoordinate StartCoord = GridManager->WorldToGrid(Unit->GetActorLocation());
+	FGridCoordinate GoalCoord = GridManager->WorldToGrid(CurrentMoveGoal);
 
-	// play the cursor feedback depending on whether our move succeeded or not
+	UE_LOG(LogTemp, Warning, TEXT("Unit world pos: %s"), *Unit->GetActorLocation().ToString());
+	UE_LOG(LogTemp, Warning, TEXT("StartCoord: %s"), *StartCoord.ToString());
+	UE_LOG(LogTemp, Warning, TEXT("GoalCoord: %s"), *GoalCoord.ToString());
+
+	// find path using A*
+	TArray<FGridCoordinate> GridPath = FPathfinder::FindPath(StartCoord, GoalCoord, GridManager);
+
+	UE_LOG(LogTemp, Warning, TEXT("Path length: %d"), GridPath.Num());
+
+	if (GridPath.Num() == 0)
+	{
+		BP_CursorFeedback(CachedInteraction, false);
+		return;
+	}
+
+	// convert grid path to world positions
+	TArray<FVector> WorldPath;
+	WorldPath.Reserve(GridPath.Num());
+	for (const FGridCoordinate& Coord : GridPath)
+	{
+		WorldPath.Add(GridManager->GridToWorld(Coord));
+	}
+
+	// move the unit along the world path
+	const bool bSuccess = UnitCommandComponent->MoveUnit(Unit, WorldPath);
+
 	BP_CursorFeedback(CachedInteraction, bSuccess);
 }
 
