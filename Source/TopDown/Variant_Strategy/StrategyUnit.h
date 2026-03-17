@@ -37,6 +37,15 @@ public:
 	/** Constructor */
 	AStrategyUnit();
 
+	// Movement
+	/** Maximum cells this unit can move per turn */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Movement")
+	int32 MovementRange = 4;
+
+	/** Whether this unit has already moved this turn */
+	UPROPERTY(BlueprintReadWrite, Category = "Unit|Movement")
+	bool bHasMoved = false;
+
 protected:
 
 	virtual void NotifyControllerChanged() override;
@@ -55,8 +64,11 @@ public:
 	/** Notifies this unit that it's been interacted with by another actor */
 	void Interact(AStrategyUnit* Interactor);
 
-	/** Attempts to move this unit to its */
+	/** Attempts to move this unit to a single location */
 	bool MoveToLocation(const FVector& Location, float AcceptanceRadius);
+
+	/** Moves this unit along a full pre-computed world-space path in one smooth movement */
+	bool MoveAlongPath(const TArray<FVector>& Waypoints, float AcceptanceRadius);
 
 protected:
 

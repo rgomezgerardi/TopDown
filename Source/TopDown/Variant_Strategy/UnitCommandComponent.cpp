@@ -19,60 +19,21 @@ bool UUnitCommandComponent::MoveUnit(AStrategyUnit* Unit, const TArray<FVector>&
 	if (ActiveUnit != nullptr)
 	{
 		ActiveUnit->OnMoveCompleted.RemoveDynamic(this, &UUnitCommandComponent::OnMoveCompleted);
+		ActiveUnit->StopMoving();
 		ActiveUnit = nullptr;
-		CachedPath.Empty();
-		CurrentPathIndex = 0;
 	}
 
-	// stop any current movement
-	Unit->StopMoving();
-
-	// cache state for this move command
 	ActiveUnit = Unit;
-	CachedPath = Path;
-	CurrentPathIndex = 0;
+	FinalDestination = Path.Last();
 
-	// subscribe to the unit's move completed delegate
 	ActiveUnit->OnMoveCompleted.AddDynamic(this, &UUnitCommandComponent::OnMoveCompleted);
 
-	// start moving to the first position
-	MoveToNextPosition();
-
-	return true;
+	return ActiveUnit->MoveAlongPath(Path, 5.0f);
 }
 
 FVector UUnitCommandComponent::GetDestination() const
 {
-	if (CachedPath.Num() == 0)
-	{
-		return FVector::ZeroVector;
-	}
-
-	return CachedPath.Last();
-}
-
-void UUnitCommandComponent::MoveToNextPosition()
-{
-	if (!IsValid(ActiveUnit))
-	{
-		// clean up if unit was destroyed mid-movement
-		ActiveUnit = nullptr;
-		CachedPath.Empty();
-		CurrentPathIndex = 0;
-		return;
-	}
-
-	// reached the end of the path — clean up
-	if (CurrentPathIndex >= CachedPath.Num())
-	{
-		ActiveUnit->OnMoveCompleted.RemoveDynamic(this, &UUnitCommandComponent::OnMoveCompleted);
-		ActiveUnit = nullptr;
-		CachedPath.Empty();
-		CurrentPathIndex = 0;
-		return;
-	}
-
-	ActiveUnit->MoveToLocation(CachedPath[CurrentPathIndex], 5.0f);
+	return FinalDestination;
 }
 
 void UUnitCommandComponent::OnMoveCompleted(AStrategyUnit* MovedUnit)
@@ -82,6 +43,6 @@ void UUnitCommandComponent::OnMoveCompleted(AStrategyUnit* MovedUnit)
 		return;
 	}
 
-	++CurrentPathIndex;
-	MoveToNextPosition();
+	ActiveUnit->OnMoveCompleted.RemoveDynamic(this, &UUnitCommandComponent::OnMoveCompleted);
+	ActiveUnit = nullptr;
 }

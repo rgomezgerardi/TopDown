@@ -77,7 +77,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Grid|Debug")
 	void DebugDrawPath(FGridCoordinate Start, FGridCoordinate Goal);
 
-	
+	// Cell Highlights
+	/** Highlight reachable cells for selected unit */
+	void HighlightCells(const TArray<FGridCoordinate>& Cells);
+
+	/** Clear all highlighted cells */
+	void ClearHighlights();
+
 	// Debugging UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid|Debug")
 	bool bShowDebugGrid = true;
 
@@ -108,4 +114,7 @@ private:
 	/** Storage for all cell data in the grid */
 	UPROPERTY()
 	TMap<FGridCoordinate, FCellData> CellDataMap;
+
+	/** Cells currently highlighted (movement range) */
+	TArray<FGridCoordinate> HighlightedCells;
 };

@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -22,6 +21,14 @@ public:
     static TArray<FGridCoordinate> FindPath(
         const FGridCoordinate& Start,
         const FGridCoordinate& Goal,
+        class AGridManager* GridManager
+    );
+
+    /** Get all cells reachable from Origin within MaxRange steps using BFS.
+     *  Excludes Origin itself. */
+    static TArray<FGridCoordinate> GetReachableCells(
+        const FGridCoordinate& Origin,
+        int32 MaxRange,
         class AGridManager* GridManager
     );
 

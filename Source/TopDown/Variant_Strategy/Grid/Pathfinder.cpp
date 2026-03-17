@@ -1,4 +1,3 @@
-
 #include "Grid/Pathfinder.h"
 #include "Grid/GridManager.h"
 
@@ -106,6 +105,56 @@ TArray<FGridCoordinate> FPathfinder::FindPath(
     
     // No path found
     return TArray<FGridCoordinate>();
+}
+
+TArray<FGridCoordinate> FPathfinder::GetReachableCells(
+    const FGridCoordinate& Origin,
+    int32 MaxRange,
+    AGridManager* GridManager)
+{
+    if (!GridManager || MaxRange <= 0)
+    {
+        return TArray<FGridCoordinate>();
+    }
+
+    TArray<FGridCoordinate> Reachable;
+    TMap<FGridCoordinate, int32> Visited; // coord → min cost to reach it
+
+    TQueue<TPair<FGridCoordinate, int32>> Queue;
+    Queue.Enqueue(TPair<FGridCoordinate, int32>(Origin, 0));
+    Visited.Add(Origin, 0);
+
+    while (!Queue.IsEmpty())
+    {
+        TPair<FGridCoordinate, int32> Current;
+        Queue.Dequeue(Current);
+
+        FGridCoordinate Coord = Current.Key;
+        int32 Cost = Current.Value;
+
+        if (Coord != Origin)
+        {
+            Reachable.Add(Coord);
+        }
+
+        if (Cost >= MaxRange)
+        {
+            continue;
+        }
+
+        TArray<FGridCoordinate> Neighbors = GetNeighbors(Coord, GridManager);
+        for (const FGridCoordinate& Neighbor : Neighbors)
+        {
+            int32 NewCost = Cost + 1;
+            if (!Visited.Contains(Neighbor) || Visited[Neighbor] > NewCost)
+            {
+                Visited.Add(Neighbor, NewCost);
+                Queue.Enqueue(TPair<FGridCoordinate, int32>(Neighbor, NewCost));
+            }
+        }
+    }
+
+    return Reachable;
 }
 
 int32 FPathfinder::CalculateHeuristic(const FGridCoordinate& A, const FGridCoordinate& B)

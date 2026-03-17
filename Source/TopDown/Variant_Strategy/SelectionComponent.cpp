@@ -9,23 +9,14 @@ USelectionComponent::USelectionComponent()
 
 void USelectionComponent::SelectUnit(AStrategyUnit* Unit)
 {
-	if (!IsValid(Unit))
+	if (!IsValid(Unit) || SelectedUnits.Contains(Unit))
 	{
 		return;
 	}
 
-	// if the unit is already selected, deselect it (toggle behavior)
-	if (SelectedUnits.Contains(Unit))
-	{
-		SelectedUnits.Remove(Unit);
-		Unit->UnitDeselected();
-	}
-	else
-	{
-		// add the unit to the selection and notify it
-		SelectedUnits.Add(Unit);
-		Unit->UnitSelected();
-	}
+	SelectedUnits.Add(Unit);
+	Unit->UnitSelected();
+	OnUnitSelected.Broadcast(Unit);
 }
 
 void USelectionComponent::DeselectUnit(AStrategyUnit* Unit)
@@ -38,6 +29,7 @@ void USelectionComponent::DeselectUnit(AStrategyUnit* Unit)
 	if (SelectedUnits.Remove(Unit) > 0)
 	{
 		Unit->UnitDeselected();
+		OnUnitDeselected.Broadcast(Unit);
 	}
 }
 
@@ -49,6 +41,7 @@ void USelectionComponent::DeselectAll()
 		if (IsValid(Unit))
 		{
 			Unit->UnitDeselected();
+			OnUnitDeselected.Broadcast(Unit);
 		}
 	}
 

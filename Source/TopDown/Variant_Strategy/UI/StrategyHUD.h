@@ -27,30 +27,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category="UI")
 	TSubclassOf<UStrategyUI> UIWidgetClass;
 
-	/** If true, the HUD will draw the selection box */
-	bool bDrawBox = false;
-
-	/** Starting coords of the selection box */
-	FVector2D BoxStart;
-
-	/** Width and height of the selection box */
-	FVector2D BoxSize;
-
-	/** Current position of the selection box */
-	FVector2D BoxCurrentPosition;
-
-	/** Color of the selection box */
-	UPROPERTY(EditAnywhere, Category="UI")
-	FLinearColor SelectionBoxColor;
-
 public:
 
 	/** Initialization */
 	virtual void BeginPlay() override;
-
-	/** Updates the drag selection box */
-	void DragSelectUpdate(FVector2D Start, FVector2D WidthAndHeight, FVector2D CurrentPosition, bool bDraw);
-
 protected:
 
 	/** Draws the HUD */

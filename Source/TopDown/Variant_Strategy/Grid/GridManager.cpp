@@ -19,32 +19,6 @@ void AGridManager::BeginPlay()
 	Super::BeginPlay();
 
 	InitializeGrid();
-
-	// Test pathfinding
-    FGridCoordinate Start(1, 1, 0);
-    FGridCoordinate Goal(8, 8, 0);
-    DebugDrawPath(Start, Goal);
-	
-	// Test: verify some cells exist
-	FCellData *Cell000 = GetCellData(FGridCoordinate(0, 0, 0));
-	FCellData *Cell555 = GetCellData(FGridCoordinate(5, 5, 1));
-
-	if (GEngine)
-	{
-		if (Cell000)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan,
-											 FString::Printf(TEXT("Cell (0,0,0): walkable=%d occupied=%d"),
-															 Cell000->bWalkable, Cell000->bOccupied));
-		}
-
-		if (Cell555)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan,
-											 FString::Printf(TEXT("Cell (5,5,1): walkable=%d occupied=%d"),
-															 Cell555->bWalkable, Cell555->bOccupied));
-		}
-	}
 }
 
 // Called every frame
@@ -145,6 +119,29 @@ void AGridManager::DrawDebugGrid() const
             }
         }
     }
+
+    // Draw highlighted (reachable) cells on top
+    for (const FGridCoordinate& Coord : HighlightedCells)
+    {
+        FVector CellWorldPos = GridOrigin + FVector(
+            (Coord.X + 0.5f) * CellSize,
+            (Coord.Y + 0.5f) * CellSize,
+            Coord.Floor * FloorHeight + 8.0f
+        );
+
+        FVector BoxExtent(CellSize * 0.5f - 2.0f, CellSize * 0.5f - 2.0f, 8.0f);
+
+        DrawDebugBox(
+            GetWorld(),
+            CellWorldPos,
+            BoxExtent,
+            FColor(0, 150, 255, 180),
+            false,
+            -1.0f,
+            0,
+            4.0f
+        );
+    }
 }
 
 #if WITH_EDITOR
@@ -242,6 +239,15 @@ void AGridManager::ClearGrid()
 	CellDataMap.Empty();
 }
 
+void AGridManager::HighlightCells(const TArray<FGridCoordinate>& Cells)
+{
+	HighlightedCells = Cells;
+}
+
+void AGridManager::ClearHighlights()
+{
+	HighlightedCells.Empty();
+}
 
 void AGridManager::DebugDrawPath(FGridCoordinate Start, FGridCoordinate Goal)
 {

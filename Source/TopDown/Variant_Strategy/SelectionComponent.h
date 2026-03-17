@@ -6,6 +6,9 @@
 
 class AStrategyUnit;
 
+/** Delegate broadcast when a unit is selected or deselected */
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnSelectionChangedDelegate, AStrategyUnit*);
+
 /**
  * Handles unit selection state and logic.
  * Lives on AStrategyPlayerController.
@@ -62,4 +65,10 @@ public:
 
 	/** Returns the number of currently selected units */
 	int32 GetSelectedUnitCount() const;
+
+	/** Broadcast when a unit is added to the selection */
+	FOnSelectionChangedDelegate OnUnitSelected;
+
+	/** Broadcast when a unit is removed from the selection */
+	FOnSelectionChangedDelegate OnUnitDeselected;
 };

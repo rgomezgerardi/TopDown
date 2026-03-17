@@ -7,6 +7,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Components/SphereComponent.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "NavigationPath.h"
 
 AStrategyUnit::AStrategyUnit()
 {
@@ -35,8 +36,7 @@ AStrategyUnit::AStrategyUnit()
 	GetCharacterMovement()->AvoidanceWeight = 1.0f;
 	GetCharacterMovement()->bConstrainToPlane = true;
 	GetCharacterMovement()->bSnapToPlaneAtStart = true;
-	GetCharacterMovement()->SetFixedBrakingDistance(200.0f);
-	GetCharacterMovement()->SetFixedBrakingDistance(true);
+	GetCharacterMovement()->SetFixedBrakingDistance(50.0f);
 }
 
 void AStrategyUnit::NotifyControllerChanged()
@@ -139,8 +139,42 @@ bool AStrategyUnit::MoveToLocation(const FVector& Location, float AcceptanceRadi
 	return false;
 }
 
+bool AStrategyUnit::MoveAlongPath(const TArray<FVector>& Waypoints, float AcceptanceRadius)
+{
+	if (!AIController || Waypoints.Num() == 0)
+	{
+		return false;
+	}
+
+	UPathFollowingComponent* PFComp = AIController->GetPathFollowingComponent();
+	if (!PFComp)
+	{
+		return false;
+	}
+
+	// Build a custom nav path from our grid waypoints (skip index 0 — unit is already there)
+	FNavPathSharedPtr NavPath = MakeShareable(new FNavigationPath());
+	for (int32 i = 1; i < Waypoints.Num(); ++i)
+	{
+		NavPath->GetPathPoints().Add(FNavPathPoint(Waypoints[i]));
+	}
+	NavPath->MarkReady();
+
+	FAIMoveRequest MoveReq;
+	MoveReq.SetGoalLocation(Waypoints.Last());
+	MoveReq.SetAcceptanceRadius(AcceptanceRadius);
+	MoveReq.SetAllowPartialPath(false);
+	MoveReq.SetUsePathfinding(false);
+	MoveReq.SetCanStrafe(false);
+
+	const FAIRequestID RequestID = PFComp->RequestMove(MoveReq, NavPath);
+	return RequestID.IsValid();
+}
+
 void AStrategyUnit::OnMoveFinished(FAIRequestID RequestID, const FPathFollowingResult& Result)
 {
-	// call the delegate
-	OnMoveCompleted.Broadcast(this);
+	if (Result.Code == EPathFollowingResult::Success)
+	{
+		OnMoveCompleted.Broadcast(this);
+	}
 }
